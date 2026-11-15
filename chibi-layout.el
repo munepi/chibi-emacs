@@ -1,6 +1,7 @@
-;;; nano-layout.el --- N Λ N O frame layout  -*- lexical-binding: t -*-
+;;; chibi-layout.el --- chibi frame layout  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2020 - N Λ N O developers
+;; Copyright (C) 2026 Munehiro Yamamoto
 
 ;; This file is not part of GNU Emacs.
 
@@ -21,7 +22,7 @@
 
 ;; フレームの余白、ウィンドウの区切り、折り返しの記号などの見た目。
 ;;
-;;   (nano-layout-setup)
+;;   (chibi-layout-setup)
 ;;
 ;; frame parameterは、`default-frame-alist'にまだないものだけを足す。
 ;; early-init.elなどで決めた大きさは、そのまま使われる。
@@ -34,9 +35,9 @@
 ;;; Code:
 
 (require 'disp-table)
-(require 'nano-faces)
+(require 'chibi-faces)
 
-(defcustom nano-layout-frame-parameters
+(defcustom chibi-layout-frame-parameters
   '((min-height . 1)
     (height     . 45)
     (min-width  . 1)
@@ -47,20 +48,20 @@
     (right-fringe   . 1)
     (tool-bar-lines . 0)
     (menu-bar-lines . 0))
-  "Frame parameters added to `default-frame-alist' by `nano-layout-setup'.
+  "Frame parameters added to `default-frame-alist' by `chibi-layout-setup'.
 Parameters that are already in `default-frame-alist' are kept."
-  :group 'nano
+  :group 'chibi
   :type '(alist :key-type symbol :value-type sexp))
 
-(defun nano-layout--term-display-table ()
+(defun chibi-layout--term-display-table ()
   "Use an empty display table in term mode.
 Otherwise, zsh shows a spurious % after each command on macOS."
   (setq buffer-display-table (make-display-table)))
 
 ;;;###autoload
-(defun nano-layout-setup ()
-  "Set up the frame layout of nano."
-  (dolist (param nano-layout-frame-parameters)
+(defun chibi-layout-setup ()
+  "Set up the frame layout of chibi."
+  (dolist (param chibi-layout-frame-parameters)
     (unless (assq (car param) default-frame-alist)
       (setq default-frame-alist (append default-frame-alist (list param)))))
   (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
@@ -73,10 +74,10 @@ Otherwise, zsh shows a spurious % after each command on macOS."
   (window-divider-mode 1)
   ;; Truncation and wrap glyphs
   (set-display-table-slot standard-display-table 'truncation
-                          (make-glyph-code ?… 'nano-face-fallback))
+                          (make-glyph-code ?… 'chibi-face-fallback))
   (set-display-table-slot standard-display-table 'wrap
-                          (make-glyph-code ?↩ 'nano-face-fallback))
-  (add-hook 'term-mode-hook #'nano-layout--term-display-table))
+                          (make-glyph-code ?↩ 'chibi-face-fallback))
+  (add-hook 'term-mode-hook #'chibi-layout--term-display-table))
 
-(provide 'nano-layout)
-;;; nano-layout.el ends here
+(provide 'chibi-layout)
+;;; chibi-layout.el ends here

@@ -1,6 +1,7 @@
-;;; nano-splash.el --- N Λ N O splash screen  -*- lexical-binding: t -*-
+;;; chibi-splash.el --- chibi splash screen  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2020 - N Λ N O developers
+;; Copyright (C) 2026 Munehiro Yamamoto
 
 ;; This file is not part of GNU Emacs.
 
@@ -22,73 +23,73 @@
 ;; 起動時のsplash screen。
 ;;  - ロゴ、mode line、scroll barはない。
 ;;  - キーを押すかクリックすると閉じる。
-;;  - `nano-splash-timeout'秒たつと閉じる。Mac port（emacs-mac）では
+;;  - `chibi-splash-timeout'秒たつと閉じる。Mac port（emacs-mac）では
 ;;    fade outする。
 ;;  - ファイルを開いているバッファがあるときは出さない。
 ;;
-;;   (nano-splash-setup)
+;;   (chibi-splash-setup)
 
 ;;; Code:
 
 (require 'subr-x)
-(require 'nano-faces)
+(require 'chibi-faces)
 
 (declare-function mac-start-animation "macfns.c")
 
-(defgroup nano-splash nil
-  "N Λ N O splash screen."
-  :group 'nano)
+(defgroup chibi-splash nil
+  "chibi splash screen."
+  :group 'chibi)
 
-(defcustom nano-splash-contents
+(defcustom chibi-splash-contents
   (lambda ()
-    (list (cons "GNU Emacs / N Λ N O" 'nano-face-strong)
-          (cons "Emacs made simple" 'nano-face-faded)))
+    (list (cons "GNU Emacs / chibi" 'chibi-face-strong)
+          (cons "Emacs made simple" 'chibi-face-faded)))
   "Function returning the lines of the splash screen.
 Each element is (STRING . FACE).  Every line is centered
 horizontally; STRING may contain newlines."
-  :group 'nano-splash
+  :group 'chibi-splash
   :type 'function)
 
-(defcustom nano-splash-center-vertically t
+(defcustom chibi-splash-center-vertically t
   "Non-nil means the splash contents are centered vertically."
-  :group 'nano-splash
+  :group 'chibi-splash
   :type 'boolean)
 
-(defcustom nano-splash-timeout 0.50
+(defcustom chibi-splash-timeout 0.50
   "Idle seconds before the splash screen fades out."
-  :group 'nano-splash
+  :group 'chibi-splash
   :type 'number)
 
-(defcustom nano-splash-show-help t
+(defcustom chibi-splash-show-help t
   "Non-nil means show how to get help after the splash screen.
-Only when `nano-help' is loaded."
-  :group 'nano-splash
+Only when `chibi-help' is loaded."
+  :group 'chibi-splash
   :type 'boolean)
 
-(defconst nano-splash--buffer-name "*splash*")
+(defconst chibi-splash--buffer-name "*splash*")
 
-(defvar nano-splash--timers nil
-  "Timers started by `nano-splash', except the one of the help message.")
+(defvar chibi-splash--timers nil
+  "Timers started by `chibi-splash', except the one of the help message.")
 
-(defvar nano-splash--help-timer nil
+(defvar chibi-splash--help-timer nil
   "Timer to show the help message after the splash screen.")
 
-(defun nano-splash--close (&optional keep-help)
+(defun chibi-splash--close (&optional keep-help)
   "Cancel the timers and kill the splash screen.
 If KEEP-HELP is non-nil, the help message is still shown."
-  (mapc #'cancel-timer nano-splash--timers)
-  (setq nano-splash--timers nil)
-  (when (and nano-splash--help-timer (not keep-help))
-    (cancel-timer nano-splash--help-timer)
-    (setq nano-splash--help-timer nil))
-  (when (get-buffer nano-splash--buffer-name)
+  (mapc #'cancel-timer chibi-splash--timers)
+  (setq chibi-splash--timers nil)
+  (when (and chibi-splash--help-timer (not keep-help))
+    (cancel-timer chibi-splash--help-timer)
+    (setq chibi-splash--help-timer nil))
+  (when (get-buffer chibi-splash--buffer-name)
     (message nil)
-    (kill-buffer nano-splash--buffer-name)))
+    (kill-buffer chibi-splash--buffer-name)))
 
-(defun nano-splash--insert-contents (width)
-  "Insert the lines of `nano-splash-contents', centered in WIDTH columns."
+(defun chibi-splash--insert-contents (width)
+  "Insert the lines of `chibi-splash-contents', centered in WIDTH columns."
   (let ((first t))
-    (dolist (line (funcall nano-splash-contents))
+    (dolist (line (funcall chibi-splash-contents))
       (unless first (insert "\n"))
       (setq first nil)
       (let ((start (point)))
@@ -104,32 +105,32 @@ If KEEP-HELP is non-nil, the help message is still shown."
               (center-line))
             (forward-line 1)))))))
 
-(defvar nano-splash-mode-map
+(defvar chibi-splash-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [t] #'nano-splash-kill)
+    (define-key map [t] #'chibi-splash-kill)
     map)
   "Keymap of the splash screen: any key kills it.")
 
-(defun nano-splash-help-message ()
+(defun chibi-splash-help-message ()
   "Show how to get help in the echo area."
   (message
    (concat
     (when (display-graphic-p) (propertize "\n " 'face '(:height 0.4)))
     (propertize (substitute-command-keys
-                 "Type \\[nano-quick-help] for quick help, \\[nano-help] for help.")
-                'face 'nano-face-faded)
+                 "Type \\[chibi-quick-help] for quick help, \\[chibi-help] for help.")
+                'face 'chibi-face-faded)
     (when (display-graphic-p) (propertize "\n " 'face '(:height 0.5))))))
 
 ;;;###autoload
-(defun nano-splash ()
-  "Show the nano splash screen."
+(defun chibi-splash ()
+  "Show the chibi splash screen."
   (interactive)
   (if (seq-some #'buffer-file-name (buffer-list))
       ;; ファイルを開いているときは出さない
-      (nano-splash-kill)
+      (chibi-splash-kill)
     ;; 前のsplashが残っていれば閉じる
-    (nano-splash--close)
-    (let* ((buffer (get-buffer-create nano-splash--buffer-name))
+    (chibi-splash--close)
+    (let* ((buffer (get-buffer-create chibi-splash--buffer-name))
            (window (progn
                      (with-current-buffer buffer
                        (setq header-line-format nil
@@ -145,22 +146,22 @@ If KEEP-HELP is non-nil, the help message is still shown."
                       vertical-scroll-bar nil
                       horizontal-scroll-bar nil)
           (face-remap-add-relative 'link :underline nil)
-          (when nano-splash-center-vertically
+          (when chibi-splash-center-vertically
             (insert-char ?\n (1+ (/ height 2))))
-          (nano-splash--insert-contents width)
+          (chibi-splash--insert-contents width)
           (goto-char (point-min)))
         (read-only-mode 1)
-        (use-local-map nano-splash-mode-map))
-      (setq nano-splash--timers
+        (use-local-map chibi-splash-mode-map))
+      (setq chibi-splash--timers
             (list (run-with-idle-timer 0.05 nil (lambda () (message nil)))
-                  (run-with-idle-timer nano-splash-timeout nil
-                                       #'nano-splash-fade-out-slow)))
-      (when (and nano-splash-show-help (fboundp 'nano-quick-help))
-        (setq nano-splash--help-timer
-              (run-with-idle-timer (+ nano-splash-timeout 0.05) nil
-                                   #'nano-splash-help-message))))))
+                  (run-with-idle-timer chibi-splash-timeout nil
+                                       #'chibi-splash-fade-out-slow)))
+      (when (and chibi-splash-show-help (fboundp 'chibi-quick-help))
+        (setq chibi-splash--help-timer
+              (run-with-idle-timer (+ chibi-splash-timeout 0.05) nil
+                                   #'chibi-splash-help-message))))))
 
-(defun nano-splash-kill ()
+(defun chibi-splash-kill ()
   "Kill the splash screen buffer (immediately)."
   (interactive)
   ;; クリックは down-mouse-N と mouse-N の2つのイベントで届く。
@@ -170,39 +171,39 @@ If KEEP-HELP is non-nil, the help message is still shown."
   (when (and (mouse-event-p last-input-event)
              (memq 'down (event-modifiers last-input-event)))
     (read-event nil nil 1))
-  (nano-splash--close))
+  (chibi-splash--close))
 
-(defun nano-splash-fade-out (&optional duration)
+(defun chibi-splash-fade-out (&optional duration)
   "Kill the splash screen, fading out the frame for DURATION seconds.
 Fading out needs the Mac port (emacs-mac) of Emacs."
   (interactive)
-  (when (get-buffer nano-splash--buffer-name)
+  (when (get-buffer chibi-splash--buffer-name)
     (when (and (display-graphic-p) (fboundp 'mac-start-animation))
       (mac-start-animation nil :type 'fade-out :duration (or duration 1.0)))
     ;; 時間で閉じたときは、続けてhelpの案内を出す
-    (nano-splash--close t)))
+    (chibi-splash--close t)))
 
-(defun nano-splash-fade-out-slow ()
+(defun chibi-splash-fade-out-slow ()
   "Fade out the splash screen in 1 second."
   (interactive)
-  (nano-splash-fade-out 1.00))
+  (chibi-splash-fade-out 1.00))
 
-(defun nano-splash-fade-out-fast ()
+(defun chibi-splash-fade-out-fast ()
   "Fade out the splash screen in 0.25 seconds."
   (interactive)
-  (nano-splash-fade-out 0.25))
+  (chibi-splash-fade-out 0.25))
 
 ;;;###autoload
-(defun nano-splash-setup ()
+(defun chibi-splash-setup ()
   "Show the splash screen at startup.
 Do nothing if -no-splash, --file, --insert or --find-file is on the
 command line."
   (unless (seq-some (lambda (option) (member option command-line-args))
                     '("-no-splash" "--file" "--insert" "--find-file"))
-    (add-hook 'window-setup-hook #'nano-splash)
+    (add-hook 'window-setup-hook #'chibi-splash)
     (setq inhibit-startup-screen t
           inhibit-startup-message t
           inhibit-startup-echo-area-message t)))
 
-(provide 'nano-splash)
-;;; nano-splash.el ends here
+(provide 'chibi-splash)
+;;; chibi-splash.el ends here

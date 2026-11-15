@@ -1,4 +1,4 @@
-;;; nano.el --- N Λ N O Emacs (Japanese fork)  -*- lexical-binding: t -*-
+;;; chibi.el --- chibi Emacs: a Japanese-friendly N Λ N O derivative  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2020 - N Λ N O developers
 ;; Copyright (C) 2026 Munehiro Yamamoto
@@ -8,7 +8,7 @@
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: faces, frames
-;; URL: https://github.com/munepi/nano-emacs-ja
+;; URL: https://github.com/munepi/chibi-emacs
 
 ;; This file is not part of GNU Emacs.
 
@@ -27,26 +27,27 @@
 
 ;;; Commentary:
 
-;; rougier/nano-emacsをもとにした、日本語環境向けの個人的な改変版。
+;; N Λ N O Emacs（rougier/nano-emacs）をもとにした、日本語環境向けの
+;; 個人的なpackage。
 ;;
 ;; このファイルはpackageのmain fileで、中身はない。各モジュールは
 ;; `require'しただけでは設定を変えないので、init.elから次のように
 ;; 呼ぶ（詳しくはREADME.mdを参照）。
 ;;
-;;   (setq nano-font-family-monospaced "PlemolJP35 Console NFJ"
-;;         nano-font-family-cjk        "PlemolJP35 Console NFJ"
-;;         nano-font-size              20)
-;;   (require 'nano-layout)
-;;   (require 'nano-theme)
-;;   (require 'nano-modeline)
-;;   (require 'nano-splash)
-;;   (nano-layout-setup)
-;;   (nano-theme-set 'vscmacs)          ; light, dark, vscmacs
-;;   (nano-refresh-theme)
-;;   (nano-modeline-mode 1)
-;;   (nano-splash-setup)
+;;   (setq chibi-font-family-monospaced "PlemolJP35 Console NFJ"
+;;         chibi-font-family-cjk        "PlemolJP35 Console NFJ"
+;;         chibi-font-size              20)
+;;   (require 'chibi-layout)
+;;   (require 'chibi-theme)
+;;   (require 'chibi-modeline)
+;;   (require 'chibi-splash)
+;;   (chibi-layout-setup)
+;;   (chibi-theme-set 'vscmacs)          ; light, dark, vscmacs
+;;   (chibi-refresh-theme)
+;;   (chibi-modeline-mode 1)
+;;   (chibi-splash-setup)
 
 ;;; Code:
 
-(provide 'nano)
-;;; nano.el ends here
+(provide 'chibi)
+;;; chibi.el ends here

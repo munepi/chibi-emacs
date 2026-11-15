@@ -1,6 +1,7 @@
-;;; nano-help.el --- N Λ N O quick help and help screen  -*- lexical-binding: t -*-
+;;; chibi-help.el --- chibi quick help and help screen  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2020 - N Λ N O developers
+;; Copyright (C) 2026 Munehiro Yamamoto
 
 ;; This file is not part of GNU Emacs.
 
@@ -19,22 +20,22 @@
 
 ;;; Commentary:
 
-;; よく使うキーをecho areaに出す`nano-quick-help'と、quick-help.orgを
-;; 開く`nano-help'。キーは割り当てないので、好みで割り当てる。
+;; よく使うキーをecho areaに出す`chibi-quick-help'と、quick-help.orgを
+;; 開く`chibi-help'。キーは割り当てないので、好みで割り当てる。
 ;;
-;;   (global-set-key (kbd "C-c h") #'nano-quick-help)
+;;   (global-set-key (kbd "C-c h") #'chibi-quick-help)
 
 ;;; Code:
 
 (defvar org-confirm-elisp-link-function)
 
-(defconst nano-help--file
+(defconst chibi-help--file
   (expand-file-name "quick-help.org"
                     (file-name-directory (or load-file-name buffer-file-name)))
   "The help screen.")
 
 ;;;###autoload
-(defun nano-quick-help ()
+(defun chibi-quick-help ()
   "Show the most common keys in the echo area."
   (interactive)
   (let ((message-log-max nil))
@@ -49,22 +50,22 @@
       (propertize "\n " 'face '(:height 0.5))))
     (sit-for 30)))
 
-(defvar-keymap nano-help-mode-map
+(defvar-keymap chibi-help-mode-map
   "q" #'kill-current-buffer)
 
-(define-derived-mode nano-help-mode org-mode "Nano help"
-  "Major mode of the nano help screen.")
+(define-derived-mode chibi-help-mode org-mode "chibi help"
+  "Major mode of the chibi help screen.")
 
 ;;;###autoload
-(defun nano-help ()
-  "Show the nano help screen."
+(defun chibi-help ()
+  "Show the chibi help screen."
   (interactive)
-  (find-file-read-only (if (file-exists-p nano-help--file)
-                           nano-help--file
+  (find-file-read-only (if (file-exists-p chibi-help--file)
+                           chibi-help--file
                          (locate-file "quick-help.org" load-path)))
-  (nano-help-mode)
+  (chibi-help-mode)
   ;; quick-help.orgのelispリンクを、確認なしで実行する
   (setq-local org-confirm-elisp-link-function nil))
 
-(provide 'nano-help)
-;;; nano-help.el ends here
+(provide 'chibi-help)
+;;; chibi-help.el ends here

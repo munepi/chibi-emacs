@@ -1,6 +1,7 @@
-;;; nano-base-colors.el --- The 9 basic colors of N Λ N O  -*- lexical-binding: t -*-
+;;; chibi-base-colors.el --- The 9 basic colors of chibi  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2020 - N Λ N O developers
+;; Copyright (C) 2026 Munehiro Yamamoto
 
 ;; This file is not part of GNU Emacs.
 
@@ -19,22 +20,22 @@
 
 ;;; Commentary:
 
-;; nanoの9つの基本色。既定値は、読み込んだときのEmacsのfaceから取る。
-;; 普通は`nano-theme-set'で、`nano-theme-palettes'の配色に切り替える。
+;; chibiの9つの基本色。既定値は、読み込んだときのEmacsのfaceから取る。
+;; 普通は`chibi-theme-set'で、`chibi-theme-palettes'の配色に切り替える。
 ;;
 ;; ほかに、配色によっては次の2色を使う（nilならsubtleと同じ）。
-;; - `nano-color-header-background'：header lineの背景
-;; - `nano-color-border'：ウィンドウの区切り線（mode lineの下線）
+;; - `chibi-color-header-background'：header lineの背景
+;; - `chibi-color-border'：ウィンドウの区切り線（mode lineの下線）
 
 ;;; Code:
 
-(defgroup nano nil
-  "Faces and colors for the nano emacs theme."
+(defgroup chibi nil
+  "Faces and colors for the chibi emacs theme."
   :group 'faces)
 
 ;; customizeは、defcustomのSTANDARDを評価し直して既定値かどうかを
 ;; 判断するので、既定の色は読み込んだときに一度だけ取っておく。
-(defvar nano-base-colors--defaults
+(defvar chibi-base-colors--defaults
   `((foreground . ,(face-foreground 'default nil t))
     (background . ,(face-background 'default nil t))
     (highlight  . ,(face-background 'fringe nil t))
@@ -46,53 +47,53 @@
     (faded      . ,(face-foreground 'shadow nil t)))
   "Default colors, taken from the faces when this file was loaded.")
 
-(defun nano-base-colors--get (name)
+(defun chibi-base-colors--get (name)
   "Return the default color of NAME, a symbol such as `foreground'."
-  (alist-get name nano-base-colors--defaults))
+  (alist-get name chibi-base-colors--defaults))
 
-(defcustom nano-color-foreground (nano-base-colors--get 'foreground)
+(defcustom chibi-color-foreground (chibi-base-colors--get 'foreground)
   "Foreground color of the regular text."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-background (nano-base-colors--get 'background)
+(defcustom chibi-color-background (chibi-base-colors--get 'background)
   "Background color of the frame."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-highlight (nano-base-colors--get 'highlight)
+(defcustom chibi-color-highlight (chibi-base-colors--get 'highlight)
   "Background color of the current line (`hl-line')."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-critical (nano-base-colors--get 'critical)
+(defcustom chibi-color-critical (chibi-base-colors--get 'critical)
   "Color for information that requires immediate action."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-salient (nano-base-colors--get 'salient)
+(defcustom chibi-color-salient (chibi-base-colors--get 'salient)
   "Color for important information, such as links and keywords."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-strong (nano-base-colors--get 'strong)
+(defcustom chibi-color-strong (chibi-base-colors--get 'strong)
   "Color for structural information, such as titles."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-popout (nano-base-colors--get 'popout)
+(defcustom chibi-color-popout (chibi-base-colors--get 'popout)
   "Color for information that needs attention, such as strings."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-subtle (nano-base-colors--get 'subtle)
+(defcustom chibi-color-subtle (chibi-base-colors--get 'subtle)
   "Background color that suggests an area, such as the region."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-faded (nano-base-colors--get 'faded)
+(defcustom chibi-color-faded (chibi-base-colors--get 'faded)
   "Color for less important information, such as comments."
-  :type 'color :group 'nano)
+  :type 'color :group 'chibi)
 
-(defcustom nano-color-header-background nil
-  "Background color of the header line, or nil to use `nano-color-subtle'."
-  :type '(choice (const :tag "Same as subtle" nil) color) :group 'nano)
+(defcustom chibi-color-header-background nil
+  "Background color of the header line, or nil to use `chibi-color-subtle'."
+  :type '(choice (const :tag "Same as subtle" nil) color) :group 'chibi)
 
-(defcustom nano-color-border nil
-  "Color of the window separators, or nil to use `nano-color-subtle'."
-  :type '(choice (const :tag "Same as subtle" nil) color) :group 'nano)
+(defcustom chibi-color-border nil
+  "Color of the window separators, or nil to use `chibi-color-subtle'."
+  :type '(choice (const :tag "Same as subtle" nil) color) :group 'chibi)
 
-(provide 'nano-base-colors)
-;;; nano-base-colors.el ends here
+(provide 'chibi-base-colors)
+;;; chibi-base-colors.el ends here
