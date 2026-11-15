@@ -1,35 +1,39 @@
-;;; -*- lexical-binding: t -*-
-;; ---------------------------------------------------------------------
-;; GNU Emacs / N Λ N O - Emacs made simple
-;; Copyright (C) 2020 - N Λ N O developers 
-;;
+;;; nano-splash.el --- N Λ N O splash screen  -*- lexical-binding: t -*-
+
+;; Copyright (C) 2020 - N Λ N O developers
+
+;; This file is not part of GNU Emacs.
+
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
-;;
+
 ;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
-;;
+
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-;; ---------------------------------------------------------------------
-;; 
-;; This file defines the splash screen
-;;  - No logo, no modeline, no scrollbars
-;;  - Any key / mouse click kills the splash screen
-;;  - With emacs-mac (Mituharu), splash screen is faded out after .5 seconds
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; 起動時のsplash screen。
+;;  - ロゴ、mode line、scroll barはない。
+;;  - キーを押すかクリックすると閉じる。
+;;  - `nano-splash-timeout'秒たつと閉じる。Mac port（emacs-mac）では
+;;    fade outする。
+;;  - ファイルを開いているバッファがあるときは出さない。
 ;;
-;; Note: The screen is not shown if there are opened file buffers. For
-;;       example, if you start emacs with a filename on the command
-;;       line, the splash screen is not shown.
-;;
-;; Usage:
-;;  (require 'nano-splash)
+;;   (nano-splash-setup)
+
+;;; Code:
+
 (require 'subr-x)
-(require 'cl-lib)
+(require 'nano-faces)
+
+(declare-function mac-start-animation "macfns.c")
 
 (defgroup nano-splash nil
   "N Λ N O splash screen."
@@ -55,111 +59,106 @@ horizontally; STRING may contain newlines."
   :group 'nano-splash
   :type 'number)
 
+(defcustom nano-splash-show-help t
+  "Non-nil means show how to get help after the splash screen.
+Only when `nano-help' is loaded."
+  :group 'nano-splash
+  :type 'boolean)
+
+(defconst nano-splash--buffer-name "*splash*")
+
+(defvar nano-splash--timers nil
+  "Timers started by `nano-splash', except the one of the help message.")
+
+(defvar nano-splash--help-timer nil
+  "Timer to show the help message after the splash screen.")
+
+(defun nano-splash--close (&optional keep-help)
+  "Cancel the timers and kill the splash screen.
+If KEEP-HELP is non-nil, the help message is still shown."
+  (mapc #'cancel-timer nano-splash--timers)
+  (setq nano-splash--timers nil)
+  (when (and nano-splash--help-timer (not keep-help))
+    (cancel-timer nano-splash--help-timer)
+    (setq nano-splash--help-timer nil))
+  (when (get-buffer nano-splash--buffer-name)
+    (message nil)
+    (kill-buffer nano-splash--buffer-name)))
+
+(defun nano-splash--insert-contents (width)
+  "Insert the lines of `nano-splash-contents', centered in WIDTH columns."
+  (let ((first t))
+    (dolist (line (funcall nano-splash-contents))
+      (unless first (insert "\n"))
+      (setq first nil)
+      (let ((start (point)))
+        (insert (propertize (car line) 'face (cdr line)))
+        ;; ウィンドウより長い行（Featuresなど）は、truncate-linesがtだと
+        ;; 切れてしまうので、幅に合わせて改行してから中央に寄せる。
+        (let ((fill-column (max 20 (- width 4))))
+          (fill-region start (point)))
+        (save-excursion
+          (goto-char start)
+          (while (< (point) (point-max))
+            (let ((fill-column width))
+              (center-line))
+            (forward-line 1)))))))
+
+(defvar nano-splash-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [t] #'nano-splash-kill)
+    map)
+  "Keymap of the splash screen: any key kills it.")
+
+(defun nano-splash-help-message ()
+  "Show how to get help in the echo area."
+  (message
+   (concat
+    (when (display-graphic-p) (propertize "\n " 'face '(:height 0.4)))
+    (propertize (substitute-command-keys
+                 "Type \\[nano-quick-help] for quick help, \\[nano-help] for help.")
+                'face 'nano-face-faded)
+    (when (display-graphic-p) (propertize "\n " 'face '(:height 0.5))))))
+
+;;;###autoload
 (defun nano-splash ()
-  "Nano Emacs splash screen"
-  
+  "Show the nano splash screen."
   (interactive)
-
-  ;; Hide modeline before window-body-height is computed
-  (let* ((splash-buffer (get-buffer-create "*splash*")))
-    (with-current-buffer splash-buffer
-      (setq header-line-format nil)
-      (setq mode-line-format nil)))
-  
-  (let* ((splash-buffer  (get-buffer-create "*splash*"))
-         (height         (round (- (window-body-height nil) 1) ))
-         (width          (round (window-body-width nil)        ))
-         (padding-center (+ (/ height 2) 1)))
-    
-    ;; If there are buffer associated with filenames,
-    ;;  we don't show the splash screen.
-    (if (eq 0 (length (cl-loop for buf in (buffer-list)
-                              if (buffer-file-name buf)
-                              collect (buffer-file-name buf))))
-        
-        (with-current-buffer splash-buffer
+  (if (seq-some #'buffer-file-name (buffer-list))
+      ;; ファイルを開いているときは出さない
+      (nano-splash-kill)
+    ;; 前のsplashが残っていれば閉じる
+    (nano-splash--close)
+    (let* ((buffer (get-buffer-create nano-splash--buffer-name))
+           (window (progn
+                     (with-current-buffer buffer
+                       (setq header-line-format nil
+                             mode-line-format nil))
+                     (display-buffer-same-window buffer nil)))
+           (height (1- (window-body-height window)))
+           (width (window-body-width window)))
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
           (erase-buffer)
-          
-          ;; Buffer local settings
-          (if (one-window-p) (setq mode-line-format nil))
-          (setq cursor-type nil)
-          (setq line-spacing 0)
-          (setq vertical-scroll-bar nil)
-          (setq horizontal-scroll-bar nil)
-          (setq fill-column width)
+          (setq-local cursor-type nil
+                      line-spacing 0
+                      vertical-scroll-bar nil
+                      horizontal-scroll-bar nil)
           (face-remap-add-relative 'link :underline nil)
-          (if (not (display-graphic-p)) (menu-bar-mode 0))
-
-          ;; Vertical padding to center
           (when nano-splash-center-vertically
-            (insert-char ?\n padding-center))
-          (let ((first t))
-            (dolist (line (funcall nano-splash-contents))
-              (unless first (insert "\n"))
-              (setq first nil)
-              (let ((start (point)))
-                (insert (propertize (car line) 'face (cdr line)))
-                ;; ウィンドウより長い行（Features など）は、truncate-lines
-                ;; が t だと切れてしまうので、幅に合わせて改行してから
-                ;; 中央に寄せる。
-                (let ((fill-column (max 20 (- width 4))))
-                  (fill-region start (point)))
-                (save-excursion
-                  (goto-char start)
-                  (while (< (point) (point-max))
-                    (center-line)
-                    (forward-line 1))))))
-
-          (goto-char 0)
-          (read-only-mode t)
-          (local-set-key [t] 'nano-splash-kill)
-          (display-buffer-same-window splash-buffer nil)
-          (run-with-idle-timer 0.05 nil (lambda() (message nil)))
-          (run-with-idle-timer nano-splash-timeout nil 'nano-splash-fade-out-slow)
-	  (if (fboundp 'nano-splash-help-message)
-              (run-with-idle-timer (+ nano-splash-timeout 0.05) nil 'nano-splash-help-message))
-	  )
-      (nano-splash-kill))))
-
-
-(defun center-string (string)
-  "Pad a string with space on the left such as to center it"
-  (let* ((padding (/ (- (window-body-width) (string-width string)) 2))
-         (padding (+ (string-width string) padding)))
-    ;; If the string is displayed as a tooltip, don't pad it
-    (if (and tooltip-mode (fboundp 'x-show-tip))
-        string
-      (format (format "%%%ds" padding) string))))
-
-;; Mac only animation , available from
-;;  https://bitbucket.org/mituharu/emacs-mac/src/master/
-;;  https://github.com/railwaycat/homebrew-emacsmacport
-(defvar mac-animation-locked-p nil)
-(defun mac-animation-toggle-lock ()
-  (setq mac-animation-locked-p (not mac-animation-locked-p)))
-(defun mac-animation-fade-out (duration &rest _args)
-  (unless mac-animation-locked-p
-    (mac-animation-toggle-lock)
-    (mac-start-animation nil :type 'fade-out :duration duration)
-    (run-with-timer duration nil 'mac-animation-toggle-lock)))
-(defun nano-splash-fade-out (duration)
-  "Fade out current frame for duration and goes to command-or-bufffer"
-  (interactive)
-  (defalias 'mac-animation-fade-out-local
-    (apply-partially 'mac-animation-fade-out duration))
-  (if (get-buffer "*splash*")
-      (progn (if (and (display-graphic-p) (fboundp 'mac-start-animation))
-                 (advice-add 'set-window-buffer
-                             :before 'mac-animation-fade-out-local))
-             (message nil)
-             (kill-buffer "*splash*")
-             (if (and (display-graphic-p) (fboundp 'mac-start-animation))
-                 (advice-remove 'set-window-buffer
-                                'mac-animation-fade-out-local)))))
-(defun nano-splash-fade-out-slow ()
-  (interactive) (nano-splash-fade-out 1.00))
-(defun nano-splash-fade-out-fast ()
-  (interactive) (nano-splash-fade-out 0.25))
+            (insert-char ?\n (1+ (/ height 2))))
+          (nano-splash--insert-contents width)
+          (goto-char (point-min)))
+        (read-only-mode 1)
+        (use-local-map nano-splash-mode-map))
+      (setq nano-splash--timers
+            (list (run-with-idle-timer 0.05 nil (lambda () (message nil)))
+                  (run-with-idle-timer nano-splash-timeout nil
+                                       #'nano-splash-fade-out-slow)))
+      (when (and nano-splash-show-help (fboundp 'nano-quick-help))
+        (setq nano-splash--help-timer
+              (run-with-idle-timer (+ nano-splash-timeout 0.05) nil
+                                   #'nano-splash-help-message))))))
 
 (defun nano-splash-kill ()
   "Kill the splash screen buffer (immediately)."
@@ -171,28 +170,39 @@ horizontally; STRING may contain newlines."
   (when (and (mouse-event-p last-input-event)
              (memq 'down (event-modifiers last-input-event)))
     (read-event nil nil 1))
-  (if (get-buffer "*splash*")
-      (progn (message nil)
-             (cancel-function-timers 'nano-splash-fade-out-slow)
-             (cancel-function-timers 'nano-splash-help-message)
-             (kill-buffer "*splash*"))))
+  (nano-splash--close))
 
+(defun nano-splash-fade-out (&optional duration)
+  "Kill the splash screen, fading out the frame for DURATION seconds.
+Fading out needs the Mac port (emacs-mac) of Emacs."
+  (interactive)
+  (when (get-buffer nano-splash--buffer-name)
+    (when (and (display-graphic-p) (fboundp 'mac-start-animation))
+      (mac-start-animation nil :type 'fade-out :duration (or duration 1.0)))
+    ;; 時間で閉じたときは、続けてhelpの案内を出す
+    (nano-splash--close t)))
 
-;; Install hook after frame parameters have been applied and only if
-;; no option on the command line
-(if (and (not (member "-no-splash"  command-line-args))
-         (not (member "--file"      command-line-args))
-         (not (member "--insert"    command-line-args))
-         (not (member "--find-file" command-line-args))
-         ;; (not inhibit-startup-screen)
-         )
-    (progn
-      (add-hook 'window-setup-hook 'nano-splash)
-      (setq inhibit-startup-screen t 
-            inhibit-startup-message t
-            inhibit-startup-echo-area-message t)))
+(defun nano-splash-fade-out-slow ()
+  "Fade out the splash screen in 1 second."
+  (interactive)
+  (nano-splash-fade-out 1.00))
 
+(defun nano-splash-fade-out-fast ()
+  "Fade out the splash screen in 0.25 seconds."
+  (interactive)
+  (nano-splash-fade-out 0.25))
+
+;;;###autoload
+(defun nano-splash-setup ()
+  "Show the splash screen at startup.
+Do nothing if -no-splash, --file, --insert or --find-file is on the
+command line."
+  (unless (seq-some (lambda (option) (member option command-line-args))
+                    '("-no-splash" "--file" "--insert" "--find-file"))
+    (add-hook 'window-setup-hook #'nano-splash)
+    (setq inhibit-startup-screen t
+          inhibit-startup-message t
+          inhibit-startup-echo-area-message t)))
 
 (provide 'nano-splash)
-
-
+;;; nano-splash.el ends here

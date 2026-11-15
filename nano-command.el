@@ -1,65 +1,44 @@
-;;; -*- lexical-binding: t -*-
-;; ---------------------------------------------------------------------
-;; GNU Emacs / N Λ N O - Emacs made simple
+;;; nano-command.el --- N Λ N O header line command prompt  -*- lexical-binding: t -*-
+
 ;; Copyright (C) 2020 - N Λ N O developers
-;;
+
+;; This file is not part of GNU Emacs.
+
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
-;;
+
 ;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
-;;
+
 ;; You should have received a copy of the GNU General Public License
-;; along with this program. If not, see <http://www.gnu.org/licenses/>.
-;; ---------------------------------------------------------------------
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
 ;; An experimental header command prompt for entering non intrusive
-;; short text, without auto-completion nor history. Typical usage is
-;; for one line org-captures (TODO or meeting) or short mail
-;; answers. The command prompt is displayed using the header line and
-;; the content is copied from a tiny one line window at the bottom of
-;; this window. It takes care of setting the text to white and hiding
-;; the cursor such that it is mostly invisible.
-;; ---------------------------------------------------------------------
+;; short text, without auto-completion nor history.  The command
+;; prompt is displayed using the header line and the content is
+;; copied from a tiny one line window at the bottom of this window.
+;; It takes care of setting the text to white and hiding the cursor
+;; such that it is mostly invisible.
+;;
+;; キーは割り当てないので、好みで割り当てる。
+;;
+;;   (global-set-key (kbd "M-s-x") #'nano-command-x)
+;;   (global-set-key (kbd "M-s-s") #'nano-command-shell)
+
+;;; Code:
+
+(require 'face-remap)
+(require 'nano-faces)
 
 (define-minor-mode nano-command-mode
   "Nano command mode"
   :keymap  (make-sparse-keymap))
-
-(defface nano-face-command nil
-  "Face for the whole header line command"
-  :group 'nano)
-
-(defface nano-face-command-prompt nil
-  "Face for header line command prompt"
-  :group 'nano)
-
-(defface nano-face-command-cursor nil
-  "Face for header line command cursor"
-  :group 'nano)
-
-(set-face-attribute 'nano-face-command nil
-                    :foreground nano-color-foreground
-                    :background nano-color-subtle
-                    :box `(:line-width 1
-                           :color ,nano-color-foreground
-                           :style nil)
-                   :inherit nil)
-
-(set-face-attribute 'nano-face-command-prompt nil
-                    :inherit 'nano-face-strong
-                    :foreground nano-color-background
-                    :background nano-color-foreground
-                    :box `(:line-width 1
-                           :color ,nano-color-foreground
-                           :style nil))
-
-(set-face-attribute 'nano-face-command-cursor nil
-                    :foreground nano-color-background
-                    :background nano-color-foreground)
 
 (defvar nano-command--slave nil
   "Slave buffer displaying the command.")
@@ -84,7 +63,7 @@ to the slave buffer header line and cursor stays on first line."
     (force-mode-line-update nil)))
 
 
-(defun nano-command--check-focus (&rest args)
+(defun nano-command--check-focus (&rest _args)
   "This function check if the maste buffer has focus.
 If not, it closes nano command."
 
@@ -118,6 +97,10 @@ If not, it closes nano command."
 
 
 (defun nano-command (&optional prompt callback content information)
+  "Read a line of text in the header line with PROMPT.
+CONTENT is the initial text and INFORMATION is shown while the text
+is empty.  When the text is entered, call CALLBACK with it, or show
+it with `message' if CALLBACK is nil."
 
   ;; Cannot open nano command while in minibuffer
   (when (minibufferp)
@@ -217,7 +200,7 @@ If not, it closes nano command."
     (add-hook 'post-command-hook 'nano-command--update nil t)
     (define-key nano-command-mode-map (kbd "C-g") #'nano-command--close)
     (define-key nano-command-mode-map (kbd "<tab>")
-      #'(lambda() (interactive) (dabbrev-expand nil)))
+      (lambda () (interactive) (dabbrev-expand nil)))
       
     (define-key nano-command-mode-map (kbd "<return>")
       (lambda ()
@@ -237,123 +220,29 @@ If not, it closes nano command."
   ;; Advice after select window to check for focus
   (advice-add #'select-window :after #'nano-command--check-focus))
 
-
-
-;; ---------------------------------------------------------------------
-(defun nano-capture-refile (file &optional headline)
-  "Move current headline to a specified location"
-  (let* ((headline (or headline ""))
-         (org-complex-heading-regexp-format org-heading-regexp)
-         (pos (with-current-buffer (find-file file)
-                (org-find-exact-headline-in-buffer headline))))
-    (org-refile nil nil (list "" file nil pos))))
-
-
-(defun nano-capture-todo ()
-  (interactive)
-  (nano-command "TODO" #'nano-capture-todo-finalize ""
-                "Enter a TODO item to be refiled in inbox"))
-
-(defun nano-capture-todo-finalize (content)
-  (interactive)
-  (let ((inhibit-message t)
-        (buffer (current-buffer)))
-    (with-temp-buffer 
-      (insert (format "* TODO %s :@TODO:" content))
-      (goto-char (point-min))
-      (org-mark-ring-push)
-      (nano-capture-refile "~/Documents/org/inbox.org")
-      (org-mark-ring-goto))
-    (switch-to-buffer buffer)))
-
-(defun nano-capture-meeting ()
-  (interactive)
-  (let* ((content (format-time-string
-                   " <%+4Y-%m-%d %a %%02d:00-%%02d:00>"))
-         (now (string-to-number (format-time-string "%H")))
-         (content (format content now (+ now 1))))
-    (nano-command "MEETING" #'nano-capture-meeting-finalize content)))
-
-(defun nano-capture-meeting-finalize (content)
-  (interactive)
-  (let ((inhibit-message t)
-        (buffer (current-buffer)))
-    (with-temp-buffer 
-      (insert (format "* %s :@MEETING:" content))
-      (goto-char (point-min))
-      (org-mark-ring-push)
-      (nano-capture-refile "~/Documents/org/agenda.org" "Future")
-      (org-mark-ring-goto))
-    (switch-to-buffer buffer)))
-
-(defun nano-capture-link ()
-  (interactive)
-  (let ((inhibit-message t))
-    (setq org-link-file-path-type 'absolute)
-    (call-interactively 'org-store-link)
-    (nano-command "LINK"
-                  #'nano-capture-link-finalize
-                  (nth 1 (car org-stored-links))
-                  "Name link under cursor")))
-
-(defun nano-capture-link-finalize (content)
-  (interactive)
-  (let ((inhibit-message t)
-        (buffer (current-buffer)))
-    (with-temp-buffer 
-      (insert "* ")
-      (org-insert-link nil (car (pop org-stored-links)) content)
-      (insert " :@LINK:")
-      (org-mark-ring-push)
-      (nano-capture-refile "~/Documents/org/inbox.org" "")
-      (org-mark-ring-goto))
-    (switch-to-buffer buffer)))
-
-
 (defun nano-command-x ()
+  "Run a command entered in the header line."
   (interactive)
-  (nano-command "M-x"  #'nano-command-x-finalize "" "Enter command"))
+  (nano-command "M-x" #'nano-command-x-finalize "" "Enter command"))
 
 (defun nano-command-x-finalize (command)
-  (interactive)
-  (command-execute (intern command)))
-
+  "Run COMMAND, the name of a command."
+  (let ((symbol (intern-soft command)))
+    (if (commandp symbol)
+        (command-execute symbol 'record)
+      (user-error "No such command: %s" command))))
 
 (defun nano-command-shell ()
+  "Run a shell command entered in the header line."
   (interactive)
-  (nano-command ">_"  #'nano-command-shell-finalize
+  (nano-command ">_" #'nano-command-shell-finalize
                 "" "Enter shell command"))
 
 (defun nano-command-shell-finalize (command)
-  (interactive)
+  "Run the shell COMMAND and show its output."
   (shell-command command)
-  (switch-to-buffer "*Shell Command Output*"))
-
-(defun nano-command-mail-reply ()
-  (interactive)
-  (remove-hook 'mu4e-view-mode-hook #'nano-modeline-mu4e-view-hook)
-  (nano-command "MAIL" nil "" "Reply to sender"))
-
-(defun nano-command-mail-reply-all ()
-  (interactive)
-  (remove-hook 'mu4e-view-mode-hook #'nano-modeline-mu4e-view-hook)
-  (nano-command "MAIL" nil "" "Reply to all"))
-
-(setq mac-right-command-modifier 'alt)
-(setq mac-left-command-modifier 'meta)
-(define-key global-map (kbd "A-x") #'nano-command-x)
-(define-key global-map (kbd "A-s") #'nano-command-shell)
-
-;; (define-key global-map (kbd "C-c k") #'nano-capture-link)
-;; (define-key global-map (kbd "C-c t") #'nano-capture-todo)
-;; (define-key global-map (kbd "C-c m") #'nano-capture-meeting)
-;; (define-key global-map (kbd "C-c r") #'nano-command-mail-reply)
-;; (define-key global-map (kbd "C-c R") #'nano-command-mail-reply-all)
-
-
-;; (define-key global-map (kbd "C-c x") #'nano-command-x)
-;; (define-key global-map (kbd "C-c s") #'nano-command-shell)
-
+  (when (get-buffer "*Shell Command Output*")
+    (switch-to-buffer "*Shell Command Output*")))
 
 (provide 'nano-command)
-
+;;; nano-command.el ends here

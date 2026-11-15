@@ -1,34 +1,41 @@
-;;; -*- lexical-binding: t -*-
-;; ---------------------------------------------------------------------
-;; GNU Emacs / N Λ N O - Emacs made simple
-;; Copyright (C) 2020 - N Λ N O developers 
-;;
+;;; nano-help.el --- N Λ N O quick help and help screen  -*- lexical-binding: t -*-
+
+;; Copyright (C) 2020 - N Λ N O developers
+
+;; This file is not part of GNU Emacs.
+
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
-;;
+
 ;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
-;;
-;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
-;; ---------------------------------------------------------------------
-;; 
-;; This file defines a help message (M-p) and a help scren (M-h)
-;;
-;; Usage:
-;;
-;;  (require 'nano-help)
-;;  M-: (nano-quick-help) or M-p
-;;  M-: (nano-help) or M-h
-;;
-;; ---------------------------------------------------------------------
 
-;; Help message
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; よく使うキーをecho areaに出す`nano-quick-help'と、quick-help.orgを
+;; 開く`nano-help'。キーは割り当てないので、好みで割り当てる。
+;;
+;;   (global-set-key (kbd "C-c h") #'nano-quick-help)
+
+;;; Code:
+
+(defvar org-confirm-elisp-link-function)
+
+(defconst nano-help--file
+  (expand-file-name "quick-help.org"
+                    (file-name-directory (or load-file-name buffer-file-name)))
+  "The help screen.")
+
+;;;###autoload
 (defun nano-quick-help ()
+  "Show the most common keys in the echo area."
   (interactive)
   (let ((message-log-max nil))
     (message
@@ -42,28 +49,22 @@
       (propertize "\n " 'face '(:height 0.5))))
     (sit-for 30)))
 
-;; Help screen
-(define-derived-mode nano-help-mode org-mode "Nano help mode")
-(define-key nano-help-mode-map (kbd "q") #'kill-current-buffer)
+(defvar-keymap nano-help-mode-map
+  "q" #'kill-current-buffer)
+
+(define-derived-mode nano-help-mode org-mode "Nano help"
+  "Major mode of the nano help screen.")
+
+;;;###autoload
 (defun nano-help ()
+  "Show the nano help screen."
   (interactive)
-  (find-file-read-only (locate-file "quick-help.org" load-path))
+  (find-file-read-only (if (file-exists-p nano-help--file)
+                           nano-help--file
+                         (locate-file "quick-help.org" load-path)))
   (nano-help-mode)
+  ;; quick-help.orgのelispリンクを、確認なしで実行する
   (setq-local org-confirm-elisp-link-function nil))
 
-;; Bindings for quick help and help
-(setq mac-pass-command-to-system nil)
-(global-set-key (kbd "M-p") 'nano-quick-help)
-(global-set-key (kbd "M-h") 'nano-help)
-
-(defun nano-splash-help-message ()
-  (message
-   (concat
-    (if (display-graphic-p) (propertize "\n " 'face '(:height 0.4)))
-    (propertize (concat
-                 "Type M-p for quick help, M-h for help."
-                 " M stands for Alt, Command or (Esc)ape.")
-                'face 'nano-face-faded)
-    (if (display-graphic-p) (propertize "\n " 'face '(:height 0.5))))))
-
 (provide 'nano-help)
+;;; nano-help.el ends here

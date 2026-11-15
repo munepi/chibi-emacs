@@ -1,84 +1,82 @@
-;;; -*- lexical-binding: t -*-
-;; ---------------------------------------------------------------------
-;; GNU Emacs / N Λ N O - Emacs made simple
+;;; nano-layout.el --- N Λ N O frame layout  -*- lexical-binding: t -*-
+
 ;; Copyright (C) 2020 - N Λ N O developers
-;;
+
+;; This file is not part of GNU Emacs.
+
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
-;;
+
 ;; This program is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
-;;
+
 ;; You should have received a copy of the GNU General Public License
-;; along with this program. If not, see <http://www.gnu.org/licenses/>.
-;; ---------------------------------------------------------------------
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; フレームの余白、ウィンドウの区切り、折り返しの記号などの見た目。
+;;
+;;   (nano-layout-setup)
+;;
+;; frame parameterは、`default-frame-alist'にまだないものだけを足す。
+;; early-init.elなどで決めた大きさは、そのまま使われる。
+;;
+;; macOSでは、ターミナルで次のようにすると1pixelの枠が出る。
+;;   defaults write com.apple.universalaccess increaseContrast -bool YES
+;; anti-aliasingの強さ（0〜3）は次で変えられる。
+;;   defaults write org.gnu.Emacs AppleFontSmoothing -int 1
+
+;;; Code:
 
 (require 'disp-table)
+(require 'nano-faces)
 
-(setq default-frame-alist
-      (append (list
-	           '(min-height . 1)
-               '(height     . 45)
-	           '(min-width  . 1)
-               '(width      . 81)
-               '(vertical-scroll-bars . nil)
-               '(internal-border-width . 24)
-               '(left-fringe    . 1)
-               '(right-fringe   . 1)
-               '(tool-bar-lines . 0)
-               '(menu-bar-lines . 0))))
+(defcustom nano-layout-frame-parameters
+  '((min-height . 1)
+    (height     . 45)
+    (min-width  . 1)
+    (width      . 81)
+    (vertical-scroll-bars . nil)
+    (internal-border-width . 24)
+    (left-fringe    . 1)
+    (right-fringe   . 1)
+    (tool-bar-lines . 0)
+    (menu-bar-lines . 0))
+  "Frame parameters added to `default-frame-alist' by `nano-layout-setup'.
+Parameters that are already in `default-frame-alist' are kept."
+  :group 'nano
+  :type '(alist :key-type symbol :value-type sexp))
 
-;; on OSX, type the line below (in terminal) to get a 1 pixel border
-;; defaults write com.apple.universalaccess increaseContrast -bool YES
+(defun nano-layout--term-display-table ()
+  "Use an empty display table in term mode.
+Otherwise, zsh shows a spurious % after each command on macOS."
+  (setq buffer-display-table (make-display-table)))
 
-;; To control anti-aliasing on OSX:
-;; defaults write org.gnu.Emacs AppleFontSmoothing -int 0 (none)
-;; defaults write org.gnu.Emacs AppleFontSmoothing -int 1 (light)
-;; defaults write org.gnu.Emacs AppleFontSmoothing -int 2 (medium)
-;; defaults write org.gnu.Emacs AppleFontSmoothing -int 3 (strong)
-
-;; Fall back font for glyph missing in Roboto
-(defvar nano-font-family-fallback nil
-  "Font family for the truncation/wrap glyphs, or nil to use the default font.")
-(defface fallback `((t ,@(when nano-font-family-fallback
-                           (list :family nano-font-family-fallback))
-                       :inherit nano-face-faded))
-  "Face for the truncation and wrap glyphs.")
-(set-display-table-slot standard-display-table 'truncation
-                        (make-glyph-code ?… 'fallback))
-(set-display-table-slot standard-display-table 'wrap
-                         (make-glyph-code ?↩ 'fallback))
-
-;; (set-fontset-font t nil "Fira Code" nil 'append)
-
-;; Fix bug on OSX in term mode & zsh (spurious % after each command)
-(add-hook 'term-mode-hook
-	  (lambda () (setq buffer-display-table (make-display-table))))
-
-(setq inhibit-startup-screen t
-      inhibit-startup-message t
-      inhibit-startup-echo-area-message t
-      initial-scratch-message nil)
-(when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
-(tooltip-mode 0)
-(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
-(menu-bar-mode 0)
-;; (global-hl-line-mode 1)
-(setq x-underline-at-descent-line t)
-
-;; Vertical window divider
-(setq window-divider-default-right-width 24)
-(setq window-divider-default-places 'right-only)
-(window-divider-mode 1)
-
-;; No ugly button for checkboxes
-(setq widget-image-enable nil)
-
-;; Hide org markup for README
-(setq org-hide-emphasis-markers t)
+;;;###autoload
+(defun nano-layout-setup ()
+  "Set up the frame layout of nano."
+  (dolist (param nano-layout-frame-parameters)
+    (unless (assq (car param) default-frame-alist)
+      (setq default-frame-alist (append default-frame-alist (list param)))))
+  (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+  (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+  (when (fboundp 'tooltip-mode) (tooltip-mode -1))
+  (menu-bar-mode -1)
+  ;; Vertical window divider
+  (setq window-divider-default-right-width 24
+        window-divider-default-places 'right-only)
+  (window-divider-mode 1)
+  ;; Truncation and wrap glyphs
+  (set-display-table-slot standard-display-table 'truncation
+                          (make-glyph-code ?… 'nano-face-fallback))
+  (set-display-table-slot standard-display-table 'wrap
+                          (make-glyph-code ?↩ 'nano-face-fallback))
+  (add-hook 'term-mode-hook #'nano-layout--term-display-table))
 
 (provide 'nano-layout)
+;;; nano-layout.el ends here
