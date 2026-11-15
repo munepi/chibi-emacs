@@ -34,6 +34,11 @@
         (concat "#" (substring-no-properties vc-mode
                                  (+ (if (eq backend 'Hg) 2 3) 2))))  nil))
 
+(defun nano-mode-tramp-host-name ()
+  "Return \"@host\" when visiting a remote file, or nil."
+  (when (and buffer-file-name (file-remote-p buffer-file-name))
+    (concat "@" (file-remote-p default-directory 'host))))
+
 (defun nano-mode-name ()
   (if (listp mode-name) (car mode-name) mode-name))
 
@@ -46,7 +51,7 @@
         (output ""))
     (when (and path (equal "" (car path)))
       (setq path (cdr path)))
-    (while (and path (< (length output) (- max-length 4)))
+    (while (and path (< (string-width output) (- max-length 4)))
       (setq output (concat (car path) "/" output))
       (setq path (cdr path)))
     (when path
@@ -79,7 +84,7 @@
 		(propertize primary 'face 'nano-face-header-default)))
          (right (concat secondary " "))
          (available-width (- (window-total-width)
-			     (length prefix) (length left) (length right)
+			     (string-width prefix) (string-width left) (string-width right)
 			     (/ (window-right-divider-width) char-width)))
 	 (available-width (max 1 available-width)))
     (concat prefix
@@ -325,7 +330,7 @@
 (setq org-mode-line-string nil)
 (with-eval-after-load 'org-clock
   (add-hook 'org-clock-out-hook
-            '(lambda () (setq org-mode-line-string nil)
+            (lambda () (setq org-mode-line-string nil)
                         (force-mode-line-update))))
 
 (defun nano-modeline-org-clock-mode-p ()
@@ -444,7 +449,9 @@
                              (concat "(" mode-name
                                      (if branch (concat ", "
                                             (propertize branch 'face 'italic)))
-                                     ")" )
+                                     ")"
+                                     (let ((host (nano-mode-tramp-host-name)))
+                                       (if host (concat " " (propertize host 'face 'italic)))))
                              position)))
 
 ;; ---------------------------------------------------------------------
@@ -512,7 +519,9 @@ below or a buffer local variable 'no-mode-line'."
 
 (setq eshell-status-in-modeline nil)
 ;; (setq-default mode-line-format (list "%-"))
-(setq-default mode-line-format "")
+;; A zero-width space instead of "": with an empty mode-line-format, some
+;; modes (e.g. YaTeX's completion of environments) misbehave.
+(setq-default mode-line-format "\u200b")
 (nano-modeline)
 
 (provide 'nano-modeline)

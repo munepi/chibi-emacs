@@ -51,7 +51,6 @@
 (setq initial-major-mode 'text-mode)
 
 ;; Text mode is default major mode
-(setq default-major-mode 'text-mode)
 
 ;; Moderate font lock
 (setq font-lock-maximum-decoration nil)
@@ -124,7 +123,9 @@
     (setq interprogram-paste-function 'copy-from-osx))
 
 ;; y/n for  answering yes/no questions
-(fset 'yes-or-no-p 'y-or-n-p)
+(if (boundp 'use-short-answers)
+    (setq use-short-answers t)
+  (fset 'yes-or-no-p 'y-or-n-p))
 
 ;; No tabs
 (setq-default indent-tabs-mode nil)
@@ -144,7 +145,14 @@
 (set-default-coding-systems 'utf-8)
 (set-terminal-coding-system 'utf-8)
 (set-keyboard-coding-system 'utf-8)
-(set-language-environment   'utf-8)
+;; Do not reset the language environment: (set-language-environment 'utf-8)
+;; would override "Japanese" etc. set in early-init.el and break CJK
+;; charset priorities.  Set `nano-defaults-language-environment' to a
+;; language name (e.g. "UTF-8") to force one.
+(defvar nano-defaults-language-environment nil
+  "Language environment set by nano-defaults, or nil to keep the current one.")
+(when nano-defaults-language-environment
+  (set-language-environment nano-defaults-language-environment))
 
 ;; Unique buffer names
 (require 'uniquify)
@@ -161,12 +169,13 @@
   (setq explicit-shell-file-name "/bin/zsh"))
 
 ;; Kill term buffer when exiting
-(defadvice term-sentinel (around my-advice-term-sentinel (proc msg))
+(defun nano-defaults--term-sentinel (orig-fn proc msg)
+  "Kill the term buffer when its process exits."
   (if (memq (process-status proc) '(signal exit))
       (let ((buffer (process-buffer proc)))
-        ad-do-it
+        (funcall orig-fn proc msg)
         (kill-buffer buffer))
-    ad-do-it))
-(ad-activate 'term-sentinel)
+    (funcall orig-fn proc msg)))
+(advice-add 'term-sentinel :around #'nano-defaults--term-sentinel)
 
 (provide 'nano-defaults)

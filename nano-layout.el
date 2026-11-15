@@ -41,8 +41,12 @@
 ;; defaults write org.gnu.Emacs AppleFontSmoothing -int 3 (strong)
 
 ;; Fall back font for glyph missing in Roboto
-(defface fallback '((t :family "Fira Code"
-                       :inherit 'nano-face-faded)) "Fallback")
+(defvar nano-font-family-fallback nil
+  "Font family for the truncation/wrap glyphs, or nil to use the default font.")
+(defface fallback `((t ,@(when nano-font-family-fallback
+                           (list :family nano-font-family-fallback))
+                       :inherit nano-face-faded))
+  "Face for the truncation and wrap glyphs.")
 (set-display-table-slot standard-display-table 'truncation
                         (make-glyph-code ?… 'fallback))
 (set-display-table-slot standard-display-table 'wrap

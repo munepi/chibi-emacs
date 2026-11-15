@@ -30,6 +30,30 @@
 (require 'subr-x)
 (require 'cl-lib)
 
+(defgroup nano-splash nil
+  "N Λ N O splash screen."
+  :group 'nano)
+
+(defcustom nano-splash-contents
+  (lambda ()
+    (list (cons "GNU Emacs / N Λ N O" 'nano-face-strong)
+          (cons "Emacs made simple" 'nano-face-faded)))
+  "Function returning the lines of the splash screen.
+Each element is (STRING . FACE).  Every line is centered
+horizontally; STRING may contain newlines."
+  :group 'nano-splash
+  :type 'function)
+
+(defcustom nano-splash-center-vertically t
+  "Non-nil means the splash contents are centered vertically."
+  :group 'nano-splash
+  :type 'boolean)
+
+(defcustom nano-splash-timeout 0.50
+  "Idle seconds before the splash screen fades out."
+  :group 'nano-splash
+  :type 'number)
+
 (defun nano-splash ()
   "Nano Emacs splash screen"
   
@@ -66,29 +90,36 @@
           (if (not (display-graphic-p)) (menu-bar-mode 0))
 
           ;; Vertical padding to center
-          (insert-char ?\n padding-center)
-          (insert (propertize "GNU Emacs / N Λ N O" 'face 'nano-face-strong))
-          (center-line)
-          (insert "\n")
-          (insert (propertize "Emacs made simple" 'face 'nano-face-faded))
-          (center-line)
+          (when nano-splash-center-vertically
+            (insert-char ?\n padding-center))
+          (let ((first t))
+            (dolist (line (funcall nano-splash-contents))
+              (unless first (insert "\n"))
+              (setq first nil)
+              (let ((start (point)))
+                (insert (propertize (car line) 'face (cdr line)))
+                (save-excursion
+                  (goto-char start)
+                  (while (< (point) (point-max))
+                    (center-line)
+                    (forward-line 1))))))
 
           (goto-char 0)
           (read-only-mode t)
           (local-set-key [t] 'nano-splash-kill)
           (display-buffer-same-window splash-buffer nil)
           (run-with-idle-timer 0.05 nil (lambda() (message nil)))
-          (run-with-idle-timer 0.50 nil 'nano-splash-fade-out-slow)
+          (run-with-idle-timer nano-splash-timeout nil 'nano-splash-fade-out-slow)
 	  (if (fboundp 'nano-splash-help-message)
-              (run-with-idle-timer 0.55 nil 'nano-splash-help-message))
+              (run-with-idle-timer (+ nano-splash-timeout 0.05) nil 'nano-splash-help-message))
 	  )
       (nano-splash-kill))))
 
 
 (defun center-string (string)
   "Pad a string with space on the left such as to center it"
-  (let* ((padding (/ (- (window-body-width) (length string)) 2))
-         (padding (+ (length string) padding)))
+  (let* ((padding (/ (- (window-body-width) (string-width string)) 2))
+         (padding (+ (string-width string) padding)))
     ;; If the string is displayed as a tooltip, don't pad it
     (if (and tooltip-mode (fboundp 'x-show-tip))
         string

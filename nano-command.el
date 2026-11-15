@@ -76,7 +76,7 @@ to the slave buffer header line and cursor stays on first line."
 
   ;; Makes sure cursor stays on first line
   (with-current-buffer nano-command--master
-   (let ((eol (save-excursion (goto-char (point-min)) (point-at-eol))))
+   (let ((eol (save-excursion (goto-char (point-min)) (line-end-position))))
     (if (> (point) eol) (goto-char eol))))
   
   ;; Update slave header line
@@ -155,7 +155,7 @@ If not, it closes nano command."
 
       ;; This tries to hide most of the master window
       (goto-char (point-min))
-      (overlay-put (make-overlay (point-at-bol) (+ (point-at-eol) 1))
+      (overlay-put (make-overlay (line-beginning-position) (+ (line-end-position) 1))
                    'face '(:height 10))
      (setq cursor-type nil)
       
@@ -191,7 +191,7 @@ If not, it closes nano command."
          `(:eval
            (let* ((content (with-current-buffer nano-command--master
                              (save-excursion (goto-char (point-min))
-                               (buffer-substring (point-at-bol) (point-at-eol)))))
+                               (buffer-substring (line-beginning-position) (line-end-position)))))
                   (content (cond ((> (length content) 0)
                                   (concat content " "))
                                  ((> (length ,information) 0) 
@@ -224,7 +224,7 @@ If not, it closes nano command."
         (interactive)
         (let* ((content (with-current-buffer nano-command--master
                           (save-excursion (goto-char (point-min))
-                          (buffer-substring (point-at-bol) (point-at-eol))))))
+                          (buffer-substring (line-beginning-position) (line-end-position))))))
           (nano-command--close)
           (if callback (funcall callback content)
             (message content))))))

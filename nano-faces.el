@@ -48,6 +48,33 @@ Defaults to nil."
   :group 'nano
   :type 'string)
 
+(defcustom nano-font-family-cjk nil
+  "Font family for CJK (Japanese, Chinese) characters, or nil.
+When non-nil, `nano-faces' assigns this family to the CJK scripts
+and charsets listed in `nano-font-cjk-targets' in the default
+fontset.  Since nano sets the :family of the default face, CJK
+characters would otherwise fall back to whatever font the system
+picks, which usually has a different width and height.
+Example: \"PlemolJP35 Console NFJ\", \"Source Han Code JP\"."
+  :group 'nano
+  :type '(choice (const :tag "Do not touch the fontset" nil)
+                 (string :tag "Font family")))
+
+(defcustom nano-font-cjk-rescale 1.0
+  "Rescale ratio of `nano-font-family-cjk' against the monospaced font.
+Use this to make two CJK characters exactly as wide as three (or
+two) ASCII characters, e.g. 1.2 for Hiragino with Roboto Mono."
+  :group 'nano
+  :type 'number)
+
+(defcustom nano-font-cjk-targets
+  '(japanese-jisx0208 japanese-jisx0212
+    japanese-jisx0213.2004-1 japanese-jisx0213-2
+    katakana-jisx0201 kana han cjk-misc)
+  "Scripts and charsets that use `nano-font-family-cjk'."
+  :group 'nano
+  :type '(repeat symbol))
+
 (defcustom nano-font-size 14
   "Default value for the font size of nano-theme in pt units.
 Note: to change this after startup, call
@@ -183,8 +210,20 @@ background color that is barely perceptible."
                       (plist-get (text-properties-at pos) 'face)))))
     (message "Faces: %s" faces)))
 
+(defun nano-faces-setup-cjk ()
+  "Assign `nano-font-family-cjk' to the CJK characters in the default fontset."
+  (when (and nano-font-family-cjk (display-graphic-p))
+    (let ((spec (font-spec :family nano-font-family-cjk)))
+      (dolist (target nano-font-cjk-targets)
+        (set-fontset-font t target spec)))
+    (let ((pattern (format ".*%s.*" (regexp-quote nano-font-family-cjk))))
+      (setq face-font-rescale-alist
+            (cons (cons pattern nano-font-cjk-rescale)
+                  (assoc-delete-all pattern face-font-rescale-alist))))))
+
 (defun nano-faces ()
   "Derive face attributes for nano-faces using nano-theme values."
+  (nano-faces-setup-cjk)
   (set-face-attribute 'nano-face-default nil
                       :foreground nano-color-foreground
                       :background nano-color-background
