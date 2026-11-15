@@ -41,6 +41,13 @@ Defaults to nil."
   :type 'string)
 
 ;; When we set a face, we take care of removing any previous settings
+(defcustom nano-theme-hook nil
+  "Hook run at the end of `nano-theme'.
+Theme variants such as `nano-theme-vscmacs' use this to adjust
+faces after the nano faces are derived."
+  :group 'nano
+  :type 'hook)
+
 (defun set-face (face style)
   "Reset FACE and make it inherit STYLE."
   (if (facep face)
@@ -785,7 +792,8 @@ function is a convenience wrapper used by `describe-package-1'."
   (nano-theme--helm-ff)
   (nano-theme--helm-grep)
   (nano-theme--hl-line)
-  (nano-theme--company))
+  (nano-theme--company)
+  (run-hooks 'nano-theme-hook))
 
 (defun nano-refresh-theme ()
   "Convenience function which refreshes the nano-theme.
@@ -802,7 +810,7 @@ Requires both to be loaded in order to work."
   (interactive)
   (cond ((string= nano-theme-var "light")
          (nano-theme-set-dark))
-         ((string= nano-theme-var "dark")
+         ((member nano-theme-var '("dark" "vscmacs"))
           (nano-theme-set-light))
          (t nil))
   (nano-refresh-theme))
