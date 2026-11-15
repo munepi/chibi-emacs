@@ -1,4 +1,4 @@
-;;; nano-theme-vscmacs.el --- N Λ N O dark theme with VS Code Dark+ colors  -*- lexical-binding: t -*-
+;;; nano-theme-vscmacs.el --- N Λ N O dark theme with VS Code Dark Modern colors  -*- lexical-binding: t -*-
 ;; ---------------------------------------------------------------------
 ;; GNU Emacs / N Λ N O - Emacs made simple
 ;; Copyright (C) 2020 - N Λ N O developers

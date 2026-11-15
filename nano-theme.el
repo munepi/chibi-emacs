@@ -1,4 +1,4 @@
-;;; nano-theme --- Face settings for nano-emacs
+;;; nano-theme --- Face settings for nano-emacs  -*- lexical-binding: t -*-
 ;;; License:
 ;; ---------------------------------------------------------------------
 ;; GNU Emacs / N Λ N O - Emacs made simple

@@ -1,3 +1,4 @@
+;;; -*- lexical-binding: t -*-
 ;; ---------------------------------------------------------------------
 ;; GNU Emacs / N Λ N O - Emacs made simple
 ;; Copyright (C) 2020 - N Λ N O developers 
@@ -131,7 +132,7 @@ horizontally; STRING may contain newlines."
 (defvar mac-animation-locked-p nil)
 (defun mac-animation-toggle-lock ()
   (setq mac-animation-locked-p (not mac-animation-locked-p)))
-(defun mac-animation-fade-out (duration &rest args)
+(defun mac-animation-fade-out (duration &rest _args)
   (unless mac-animation-locked-p
     (mac-animation-toggle-lock)
     (mac-start-animation nil :type 'fade-out :duration duration)
