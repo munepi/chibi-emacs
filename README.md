@@ -1,3 +1,17 @@
+> [!NOTE]
+> このリポジトリは、[rougier/nano-emacs](https://github.com/rougier/nano-emacs)をもとにした、munepiによる個人的なN Λ N O Emacsの改変版です。
+> 日本語環境で常用できることと、Emacs 31（Mac port）で動くことを目的にしています。upstreamへのPRは予定していません。
+> 改変はブランチ`munepi/japanese`にあります。
+>
+> - CJKフォントの割り当て（`nano-font-family-cjk`、`nano-font-cjk-rescale`）
+> - 日本語のバッファ名でもheader-lineの幅が崩れないようにする（`string-width`）
+> - `nano-defaults`で言語環境を上書きしない
+> - VS Code Dark+配色のdarkテーマ`nano-theme-vscmacs`と、`nano-theme-hook`
+> - Emacs 31向けのobsolete警告の解消
+>
+> This is a personal, Japanese-oriented modification of N Λ N O Emacs
+> by munepi, and is not intended to be merged upstream.
+
 ## GNU Emacs / N Λ N O
 
 **GNU Emacs / N Λ N O** is a set of configuration files for GNU Emacs
