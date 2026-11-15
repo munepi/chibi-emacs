@@ -99,6 +99,11 @@ horizontally; STRING may contain newlines."
               (setq first nil)
               (let ((start (point)))
                 (insert (propertize (car line) 'face (cdr line)))
+                ;; ウィンドウより長い行（Features など）は、truncate-lines
+                ;; が t だと切れてしまうので、幅に合わせて改行してから
+                ;; 中央に寄せる。
+                (let ((fill-column (max 20 (- width 4))))
+                  (fill-region start (point)))
                 (save-excursion
                   (goto-char start)
                   (while (< (point) (point-max))
