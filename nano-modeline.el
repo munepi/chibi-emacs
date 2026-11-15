@@ -40,7 +40,10 @@
     (concat "@" (file-remote-p default-directory 'host))))
 
 (defun nano-mode-name ()
-  (if (listp mode-name) (car mode-name) mode-name))
+  "`mode-name' を文字列にして返す。
+`mhtml-mode' などでは `mode-name' がリストのmode line構文になるので、
+`format-mode-line' で展開する。"
+  (substring-no-properties (format-mode-line mode-name)))
 
 
 ;; From https://amitp.blogspot.com/2011/08/emacs-custom-mode-line.html
