@@ -19,10 +19,19 @@
 ;;; Commentary:
 ;;
 ;; A dark variant of the nano theme with the colors of Visual Studio
-;; Code Dark+ (as in vscode-dark-plus-theme / vscmacs-theme).
+;; Code Dark Modern (extensions/theme-defaults/themes/dark_modern.json).
+;; Dark Modern includes Dark+, so the syntax colors are those of Dark+
+;; (as in vscode-dark-plus-theme / vscmacs-theme).
 ;;
 ;; Unlike `nano-theme-set-dark', the font-lock faces keep the Dark+
 ;; syntax colors instead of the nano core faces.
+;;
+;; Dark Modernのステータスバーはエディタの背景より暗い（#181818）。
+;; nanoのheader-lineはsubtle色を背景にするが、subtleはregionなどにも
+;; 使われるので、header-lineの背景だけを
+;; `nano-theme-vscmacs-header-background' で上書きする。
+;; ウィンドウの区切り線（mode-lineの下線）も、Dark Modernの境界線の色
+;; `nano-theme-vscmacs-border' にする。
 ;;
 ;; Usage:
 ;;   (require 'nano-theme-vscmacs)
@@ -60,18 +69,24 @@
     (font-lock-regexp-grouping-construct . "#D7BA7D"))
   "Foreground colors of the font-lock faces in the vscmacs theme.")
 
+(defconst nano-theme-vscmacs-header-background "#181818"
+  "Background of the header line in the vscmacs theme (statusBar.background).")
+
+(defconst nano-theme-vscmacs-border "#2B2B2B"
+  "Color of the window separators in the vscmacs theme (statusBar.border).")
+
 (defun nano-theme-set-vscmacs ()
-  "Apply the vscmacs (VS Code Dark+) Nano theme base."
+  "Apply the vscmacs (VS Code Dark Modern) Nano theme base."
   (setq frame-background-mode     'dark)
-  (setq nano-color-foreground "#D4D4D4") ;; editor.foreground
-  (setq nano-color-background "#1E1E1E") ;; editor.background
-  (setq nano-color-highlight  "#252526") ;; sideBar.background
-  (setq nano-color-critical   "#D7BA7D") ;; light orange
-  (setq nano-color-salient    "#569CD6") ;; keyword blue
-  (setq nano-color-strong     "#E8E8E8") ;;
-  (setq nano-color-popout     "#CE9178") ;; string orange
-  (setq nano-color-subtle     "#333333") ;;
-  (setq nano-color-faded      "#858585") ;; editorLineNumber.foreground
+  (setq nano-color-foreground "#CCCCCC") ;; editor.foreground
+  (setq nano-color-background "#1F1F1F") ;; editor.background
+  (setq nano-color-highlight  "#2B2B2B") ;; panel.border / textCodeBlock.background
+  (setq nano-color-critical   "#F85149") ;; errorForeground
+  (setq nano-color-salient    "#569CD6") ;; Dark+ keyword blue
+  (setq nano-color-strong     "#FFFFFF") ;; tab.activeForeground
+  (setq nano-color-popout     "#CE9178") ;; Dark+ string orange
+  (setq nano-color-subtle     "#3C3C3C") ;; input.border / textPreformat.background
+  (setq nano-color-faded      "#9D9D9D") ;; descriptionForeground
   ;; to allow for toggling of the themes.
   (setq nano-theme-var "vscmacs"))
 
@@ -84,7 +99,20 @@ Otherwise reset them, so that the other nano themes are not affected."
         (set-face-attribute (car elt) nil
                             :foreground (if active (cdr elt) 'unspecified))))))
 
+(defun nano-theme-vscmacs--header-line ()
+  "Make the header line and the window separators look like Dark Modern.
+Only when the vscmacs theme is active.  For the other themes,
+`nano-faces' and `nano-theme--mode-line' have already reset them."
+  (when (equal nano-theme-var "vscmacs")
+    (dolist (face '(nano-face-header-default nano-face-header-strong))
+      (set-face-attribute face nil
+                          :background nano-theme-vscmacs-header-background))
+    (when (display-graphic-p)
+      (dolist (face '(mode-line mode-line-inactive))
+        (set-face-attribute face nil :underline nano-theme-vscmacs-border)))))
+
 (add-hook 'nano-theme-hook #'nano-theme-vscmacs--font-lock)
+(add-hook 'nano-theme-hook #'nano-theme-vscmacs--header-line)
 
 (provide 'nano-theme-vscmacs)
 ;;; nano-theme-vscmacs.el ends here

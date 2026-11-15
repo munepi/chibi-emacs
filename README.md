@@ -6,7 +6,7 @@
 > - CJKフォントの割り当て（`nano-font-family-cjk`、`nano-font-cjk-rescale`）
 > - 日本語のバッファ名でもheader-lineの幅が崩れないようにする（`string-width`）
 > - `nano-defaults`で言語環境を上書きしない
-> - VS Code Dark+配色のdarkテーマ`nano-theme-vscmacs`と、`nano-theme-hook`
+> - VS Code Dark Modern配色（構文色はDark+）のdarkテーマ`nano-theme-vscmacs`と、`nano-theme-hook`
 > - Emacs 31向けのobsolete警告の解消
 >
 > This is a personal, Japanese-oriented modification of N Λ N O Emacs
