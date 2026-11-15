@@ -20,12 +20,17 @@
 
 ;;; Commentary:
 
-;; An experimental header command prompt for entering non intrusive
-;; short text, without auto-completion nor history.  The command
-;; prompt is displayed using the header line and the content is
-;; copied from a tiny one line window at the bottom of this window.
-;; It takes care of setting the text to white and hiding the cursor
-;; such that it is mostly invisible.
+;; ミニバッファを使わずに、header lineで短い文字列を入力するprompt。
+;;
+;; 入力は、いまのウィンドウの下に作る小さなウィンドウ（入力用の
+;; バッファ）で受け、その内容と擬似的なカーソルを、元のウィンドウの
+;; header lineに表示する。入力用のウィンドウは、文字を背景色にして
+;; 目立たないようにしている。
+;;
+;;   RET          入力を確定する
+;;   C-g          やめる（ほかのウィンドウを選んでもやめる）
+;;   TAB          補完する（chibi-command-xではコマンド名）
+;;   M-p / M-n    履歴（↑ / ↓でも）
 ;;
 ;; キーは割り当てないので、好みで割り当てる。
 ;;
@@ -34,197 +39,288 @@
 
 ;;; Code:
 
+(require 'subr-x)
 (require 'face-remap)
 (require 'chibi-faces)
 
-(define-minor-mode chibi-command-mode
-  "chibi command mode"
-  :keymap  (make-sparse-keymap))
+(defconst chibi-command--buffer-name " *chibi-command*"
+  "Name of the input buffer.
+The leading space keeps globalized minor modes (corfu, whitespace
+and so on) away from it.")
 
-(defvar chibi-command--slave nil
-  "Slave buffer displaying the command.")
+;; 実行中のpromptの状態
+(defvar chibi-command--input nil "The input buffer.")
+(defvar chibi-command--input-window nil "The window of the input buffer.")
+(defvar chibi-command--target nil "The buffer whose header line shows the prompt.")
+(defvar chibi-command--target-window nil "The window where the prompt was opened.")
+(defvar chibi-command--cookie nil "Face remapping of the header line of the target.")
+(defvar chibi-command--information nil "Text shown while the input is empty.")
+(defvar chibi-command--callback nil "Function called with the entered text.")
+(defvar chibi-command--collection nil "Completion table for TAB, or nil.")
+(defvar chibi-command--predicate nil "Predicate for `chibi-command--collection'.")
+(defvar chibi-command--history nil "History variable (a symbol), or nil.")
+(defvar chibi-command--history-index 0 "Position in the history; 0 is the input.")
+(defvar chibi-command--history-input "" "The input before moving in the history.")
 
-(defvar chibi-command--master "*chibi-command*"
-  "Master buffer recording keystrokes.")
+(defvar-keymap chibi-command-map
+  :doc "Keymap of the input buffer of `chibi-command'."
+  "RET"      #'chibi-command-submit
+  "<return>" #'chibi-command-submit
+  "C-g"      #'chibi-command-cancel
+  "TAB"      #'chibi-command-complete
+  "<tab>"    #'chibi-command-complete
+  "M-p"      #'chibi-command-history-previous
+  "<up>"     #'chibi-command-history-previous
+  "M-n"      #'chibi-command-history-next
+  "<down>"   #'chibi-command-history-next)
 
-(defvar chibi-command--cookie nil
-  "Cookie returned by face-remap-add-relative.")
+;;; Input
+
+(defun chibi-command--active-p ()
+  "Return non-nil while a prompt is open."
+  (buffer-live-p chibi-command--input))
+
+(defun chibi-command--text ()
+  "Return the entered text (the first line of the input buffer)."
+  (with-current-buffer chibi-command--input
+    (buffer-substring-no-properties
+     (point-min) (save-excursion (goto-char (point-min)) (line-end-position)))))
+
+(defun chibi-command--set-text (text)
+  "Replace the entered text with TEXT and move point to its end."
+  (with-current-buffer chibi-command--input
+    (goto-char (point-min))
+    (delete-region (point-min) (line-end-position))
+    (insert text)))
 
 (defun chibi-command--update ()
-  "This function makes sure the content of the master buffer is copied
-to the slave buffer header line and cursor stays on first line."
+  "Keep point on the first line and redisplay the header line."
+  (when (chibi-command--active-p)
+    (with-current-buffer chibi-command--input
+      (let ((eol (save-excursion (goto-char (point-min)) (line-end-position))))
+        (when (> (point) eol) (goto-char eol))))
+    (when (buffer-live-p chibi-command--target)
+      (with-current-buffer chibi-command--target
+        (force-mode-line-update)))))
 
-  ;; Makes sure cursor stays on first line
-  (with-current-buffer chibi-command--master
-   (let ((eol (save-excursion (goto-char (point-min)) (line-end-position))))
-    (if (> (point) eol) (goto-char eol))))
-  
-  ;; Update slave header line
-  (with-current-buffer chibi-command--slave
-    (force-mode-line-update nil)))
+;;; Header line
 
+(defun chibi-command--escape (string)
+  "Double the % of STRING, keeping the text properties."
+  (apply #'concat
+         (mapcar (lambda (i)
+                   (let ((char (substring string i (1+ i))))
+                     (if (equal char "%") (concat char char) char)))
+                 (number-sequence 0 (1- (length string))))))
 
-(defun chibi-command--check-focus (&rest _args)
-  "This function check if the maste buffer has focus.
-If not, it closes chibi command."
+(defun chibi-command--header ()
+  "Return the entered text with a cursor and the region, for the header line."
+  (if (not (chibi-command--active-p))
+      ""
+    (let* ((text (chibi-command--text))
+           (content (if (string-empty-p text)
+                        (propertize (concat (or chibi-command--information "") " ")
+                                    'face 'chibi-face-faded)
+                      ;; 行末のカーソルを見せるため、空白を足しておく
+                      (concat text " "))))
+      (with-current-buffer chibi-command--input
+        (when (and (region-active-p) (not (string-empty-p text)))
+          (put-text-property (min (1- (region-beginning)) (length text))
+                             (1- (min (region-end) (1+ (length text))))
+                             'face `(:foreground ,chibi-color-background
+                                     :background ,chibi-color-faded)
+                             content))
+        (put-text-property (1- (point)) (point) 'face 'chibi-face-command-cursor content))
+      ;; header lineでは%が特別な意味を持つ
+      (chibi-command--escape content))))
 
-  (if (not (eq (selected-window)
-               (get-buffer-window chibi-command--master)))
-      (chibi-command--close)))
-  
+(defun chibi-command--header-line-format (prompt)
+  "Return the header line showing PROMPT and the input."
+  (list (propertize " " 'face 'chibi-face-command-prompt 'display '(raise -0.20))
+        (propertize (chibi-command--escape prompt) 'face 'chibi-face-command-prompt)
+        (propertize " " 'face 'chibi-face-command-prompt 'display '(raise +0.15))
+        " "
+        '(:eval (chibi-command--header))))
+
+;;; Open and close
+
+(defun chibi-command--check-focus (window)
+  "Cancel the prompt when WINDOW, the input window, is deselected.
+Called from `window-selection-change-functions', which ignores
+temporary selections such as `with-selected-window'."
+  (unless (eq (selected-window) window)
+    ;; ウィンドウ構成の変更は、hookの外でする
+    (run-at-time 0 nil (lambda ()
+                         (when (and (chibi-command--active-p)
+                                    (not (eq (selected-window)
+                                             chibi-command--input-window)))
+                           (chibi-command--close))))))
+
 (defun chibi-command--close ()
-  "Close chibi command"
+  "Close the prompt and restore the header line of the target."
+  (let ((input chibi-command--input)
+        (window chibi-command--input-window)
+        (target chibi-command--target)
+        (target-window chibi-command--target-window))
+    (setq chibi-command--input nil
+          chibi-command--input-window nil)
+    (when (buffer-live-p target)
+      (with-current-buffer target
+        (kill-local-variable 'header-line-format)
+        (when chibi-command--cookie
+          (face-remap-remove-relative chibi-command--cookie))))
+    (setq chibi-command--cookie nil)
+    (let ((was-selected (eq (selected-window) window)))
+      (when (window-live-p window)
+        (ignore-errors (delete-window window)))
+      (when (buffer-live-p input)
+        (kill-buffer input))
+      (when (and was-selected (window-live-p target-window))
+        (select-window target-window)))
+    (force-mode-line-update t)))
 
-  (interactive)
-  
-  ;; Remove advice
-  (advice-remove #'select-window #'chibi-command--check-focus)
-  
-  ;; Close master window
-  (when (window-live-p (get-buffer-window chibi-command--master))
-    (delete-window (get-buffer-window chibi-command--master)))
-
-  ;; Kill master buffer
-  (when (get-buffer chibi-command--master)
-    (kill-buffer chibi-command--master))
-
-  ;; Restore slave to normal state
-  (with-selected-window (get-buffer-window chibi-command--slave)
-    (kill-local-variable 'header-line-format)
-    (face-remap-remove-relative chibi-command--cookie))
-  
-  ;; Update mode lines
-  (force-mode-line-update t))
-
-
-(defun chibi-command (&optional prompt callback content information)
+(defun chibi-command (&optional prompt callback content information
+                                collection predicate history)
   "Read a line of text in the header line with PROMPT.
 CONTENT is the initial text and INFORMATION is shown while the text
 is empty.  When the text is entered, call CALLBACK with it, or show
-it with `message' if CALLBACK is nil."
-
-  ;; Cannot open chibi command while in minibuffer
+it with `message' if CALLBACK is nil.  TAB completes the text with
+COLLECTION and PREDICATE (see `try-completion'), or with
+`dabbrev-expand' if COLLECTION is nil.  HISTORY is a history
+variable (a symbol)."
   (when (minibufferp)
-    (error "Cannot open chibi command while in minibuffer"))
-
-  ;; Cannot open chibi command while in chibi command
-  (when (eq (current-buffer) (get-buffer chibi-command--master))
-    (error "Cannot open chibi command while in mini command"))
-  
-  ;; Kill the master buffer & window if openened (not strictly necessary)
-  (when (window-live-p (get-buffer-window chibi-command--master))
-    (delete-window (get-buffer-window chibi-command--master))
-    (kill-buffer chibi-command--master))
-
-  ;; Save the slave buffer
-  (setq chibi-command--slave (current-buffer))
-
-  ;; Install chibi face command in the slave buffer
-  (setq chibi-command--cookie
-        (face-remap-add-relative 'header-line 'chibi-face-command))
-
-  ;; Create master buffer by splitting slave buffer
-  (let ((window-min-height 1)
-        (window-safe-min-height 1)
-        (window-resize-pixelwise t)
-        (split-window-keep-point t))
-    (with-selected-window (split-window-vertically -2)
-      (switch-to-buffer (get-buffer-create chibi-command--master))
-      (erase-buffer)
-      (org-mode)
-      (chibi-command-mode)
-      (if content (insert content))
-      (insert "\n")
-      (insert "-")
-
-      ;; This tries to hide most of the master window
+    (user-error "Cannot open chibi command in the minibuffer"))
+  (when (chibi-command--active-p)
+    (chibi-command--close))
+  (let* ((window-min-height 1)
+         (window-safe-min-height 1)
+         (window-resize-pixelwise t)
+         (split-window-keep-point t)
+         (target-window (selected-window))
+         (input (get-buffer-create chibi-command--buffer-name))
+         (input-window (split-window target-window -2 'below)))
+    (setq chibi-command--input input
+          chibi-command--input-window input-window
+          chibi-command--target (window-buffer target-window)
+          chibi-command--target-window target-window
+          chibi-command--information information
+          chibi-command--callback callback
+          chibi-command--collection collection
+          chibi-command--predicate predicate
+          chibi-command--history history
+          chibi-command--history-index 0
+          chibi-command--history-input "")
+    ;; 入力用のバッファ。major modeの関数を呼ばない（hookを走らせない）
+    ;; ので、fundamental-modeのまま、ほかのモードも有効にならない。
+    (with-current-buffer input
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (or content "") "\n-"))
       (goto-char (point-min))
-      (overlay-put (make-overlay (line-beginning-position) (+ (line-end-position) 1))
+      (end-of-line)
+      ;; 1行目をほぼ見えない高さにし、文字は背景色にする
+      (overlay-put (make-overlay (point-min) (1+ (line-end-position)))
                    'face '(:height 10))
-     (setq cursor-type nil)
-      
-      (setq header-line-format nil)
-      (setq mode-line-format nil)
-      (face-remap-add-relative 'default `(:foreground ,chibi-color-background))
-      (face-remap-add-relative 'region  `(:background ,chibi-color-background))
-      (fit-window-to-buffer)
-      (setq window-size-fixed t)
+      (setq-local cursor-type nil
+                  header-line-format nil
+                  mode-line-format nil)
+      (dolist (face '(default region hl-line))
+        (face-remap-add-relative face `(:foreground ,chibi-color-background
+                                        :background ,chibi-color-background)))
+      (use-local-map chibi-command-map)
+      (add-hook 'post-command-hook #'chibi-command--update nil t)
+      (add-hook 'window-selection-change-functions
+                #'chibi-command--check-focus nil t))
+    (set-window-buffer input-window input)
+    (set-window-dedicated-p input-window t)
+    (with-selected-window input-window
+      (fit-window-to-buffer))
+    (with-current-buffer input
+      (setq-local window-size-fixed t))
+    ;; 元のバッファのheader lineに、promptと入力を出す
+    (with-current-buffer chibi-command--target
+      (setq chibi-command--cookie
+            (face-remap-add-relative 'header-line 'chibi-face-command))
+      (setq-local header-line-format
+                  (chibi-command--header-line-format (or prompt "M-x"))))
+    (select-window input-window)
+    (chibi-command--update)))
 
-      ;; History
-      ;; (goto-char (point-max))
-      ;; (insert "history-item-1 history-item-2 history-item-3")  
-      ;; (goto-char (point-min))
-      ))
+;;; Commands in the prompt
 
+(defun chibi-command-submit ()
+  "Enter the text."
+  (interactive)
+  (let ((text (chibi-command--text))
+        (callback chibi-command--callback)
+        (history chibi-command--history))
+    (when (and history (not (string-empty-p text)))
+      (add-to-history history text))
+    (chibi-command--close)
+    (if callback
+        (funcall callback text)
+      (message "%s" text))))
 
-  ;; Install header line in master buffer
-  (setq header-line-format
-        (list
+(defun chibi-command-cancel ()
+  "Cancel the prompt."
+  (interactive)
+  (chibi-command--close))
 
-         ;; Prompt + one space
-         (propertize " "  'face 'chibi-face-command-prompt
-		          'display `(raise -0.20))
-         (propertize (or prompt "M-x") 'face 'chibi-face-command-prompt)
-         (propertize " "  'face 'chibi-face-command-prompt
-	  	          'display `(raise +0.15))
-         (propertize " " )
+(defun chibi-command-complete ()
+  "Complete the text with the completion table of the prompt."
+  (interactive)
+  (if (not chibi-command--collection)
+      (dabbrev-expand nil)
+    (let* ((text (chibi-command--text))
+           (completion (try-completion text chibi-command--collection
+                                       chibi-command--predicate)))
+      (cond ((null completion)
+             (message "No match"))
+            ((eq completion t)
+             (message "Sole completion"))
+            ((not (string= completion text))
+             (chibi-command--set-text completion))
+            (t
+             (let ((all (sort (all-completions text chibi-command--collection
+                                               chibi-command--predicate)
+                              #'string<)))
+               (message "%d candidates: %s%s" (length all)
+                        (string-join (seq-take all 8) "  ")
+                        (if (> (length all) 8) "  …" ""))))))))
 
-         ;; Input (copied from master). we need to add a space at end
-         ;; of content to be able to show cursor when it is at the end
-         ;; of the line.
-         `(:eval
-           (let* ((content (with-current-buffer chibi-command--master
-                             (save-excursion (goto-char (point-min))
-                               (buffer-substring (line-beginning-position) (line-end-position)))))
-                  (content (cond ((> (length content) 0)
-                                  (concat content " "))
-                                 ((> (length ,information) 0) 
-                                  (propertize ,information 'face 'chibi-face-faded))
-                                 (t " ")))
-                  (point  (with-current-buffer chibi-command--master (point)))
-                  (region (with-current-buffer chibi-command--master (region-active-p))))
+(defun chibi-command--history-move (n)
+  "Move N items back in the history (forward if N is negative)."
+  (let* ((items (and chibi-command--history
+                     (symbol-value chibi-command--history)))
+         (index (+ chibi-command--history-index n)))
+    (cond ((> index (length items)) (message "No earlier item"))
+          ((< index 0) (message "No later item"))
+          (t
+           (when (= chibi-command--history-index 0)
+             (setq chibi-command--history-input (chibi-command--text)))
+           (setq chibi-command--history-index index)
+           (chibi-command--set-text (if (= index 0)
+                                        chibi-command--history-input
+                                      (nth (1- index) items)))))))
 
-             ;; Cursor 
-             (put-text-property (- point 1) point
-                                'face 'chibi-face-command-cursor content)
-             ;; Region
-             (if region
-                 (let ((beg (with-current-buffer chibi-command--master (region-beginning)))
-                       (end (with-current-buffer chibi-command--master (region-end))))
-                   (put-text-property (- beg 1) (- end 1)
-                                      'face `(:foreground ,chibi-color-background
-                                              :background ,chibi-color-faded) content)))
-             content))))
+(defun chibi-command-history-previous ()
+  "Show the previous item of the history."
+  (interactive)
+  (chibi-command--history-move 1))
 
-  ;; Install key bindings
-  (with-current-buffer chibi-command--master
-    (add-hook 'post-command-hook 'chibi-command--update nil t)
-    (define-key chibi-command-mode-map (kbd "C-g") #'chibi-command--close)
-    (define-key chibi-command-mode-map (kbd "<tab>")
-      (lambda () (interactive) (dabbrev-expand nil)))
-      
-    (define-key chibi-command-mode-map (kbd "<return>")
-      (lambda ()
-        (interactive)
-        (let* ((content (with-current-buffer chibi-command--master
-                          (save-excursion (goto-char (point-min))
-                          (buffer-substring (line-beginning-position) (line-end-position))))))
-          (chibi-command--close)
-          (if callback (funcall callback content)
-            (message content))))))
+(defun chibi-command-history-next ()
+  "Show the next item of the history."
+  (interactive)
+  (chibi-command--history-move -1))
 
-  ;; Update mode lines and swicch to master buffer
-  (chibi-command--update)
-  (select-window (get-buffer-window chibi-command--master) t)
-  (redisplay)
-  
-  ;; Advice after select window to check for focus
-  (advice-add #'select-window :after #'chibi-command--check-focus))
+;;; Commands
 
+;;;###autoload
 (defun chibi-command-x ()
   "Run a command entered in the header line."
   (interactive)
-  (chibi-command "M-x" #'chibi-command-x-finalize "" "Enter command"))
+  (chibi-command "M-x" #'chibi-command-x-finalize "" "Enter command"
+                 obarray #'commandp 'extended-command-history))
 
 (defun chibi-command-x-finalize (command)
   "Run COMMAND, the name of a command."
@@ -233,11 +329,12 @@ it with `message' if CALLBACK is nil."
         (command-execute symbol 'record)
       (user-error "No such command: %s" command))))
 
+;;;###autoload
 (defun chibi-command-shell ()
   "Run a shell command entered in the header line."
   (interactive)
-  (chibi-command ">_" #'chibi-command-shell-finalize
-                "" "Enter shell command"))
+  (chibi-command ">_" #'chibi-command-shell-finalize "" "Enter shell command"
+                 nil nil 'shell-command-history))
 
 (defun chibi-command-shell-finalize (command)
   "Run the shell COMMAND and show its output."
