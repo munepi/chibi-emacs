@@ -159,10 +159,17 @@ horizontally; STRING may contain newlines."
 (defun nano-splash-kill ()
   "Kill the splash screen buffer (immediately)."
   (interactive)
+  ;; クリックは down-mouse-N と mouse-N の2つのイベントで届く。
+  ;; down-mouse-N でスプラッシュを閉じると、残りの mouse-N が、
+  ;; スプラッシュでの位置のまま次のバッファに届いて
+  ;; Args out of range になるので、読み捨てる。
+  (when (and (mouse-event-p last-input-event)
+             (memq 'down (event-modifiers last-input-event)))
+    (read-event nil nil 1))
   (if (get-buffer "*splash*")
       (progn (message nil)
              (cancel-function-timers 'nano-splash-fade-out-slow)
-             (cancel-function-timers 'nano-spash-help-message)
+             (cancel-function-timers 'nano-splash-help-message)
              (kill-buffer "*splash*"))))
 
 
