@@ -331,16 +331,25 @@ variable (a symbol)."
 
 ;;;###autoload
 (defun chibi-command-shell ()
-  "Run a shell command entered in the header line."
+  "Run a shell command entered in the header line.
+The command runs asynchronously, and its output buffer replaces the
+buffer of the selected window at once (see
+`chibi-command-shell-finalize')."
   (interactive)
   (chibi-command ">_" #'chibi-command-shell-finalize "" "Enter shell command"
                  nil nil 'shell-command-history))
 
 (defun chibi-command-shell-finalize (command)
-  "Run the shell COMMAND and show its output."
-  (shell-command command)
-  (when (get-buffer "*Shell Command Output*")
-    (switch-to-buffer "*Shell Command Output*")))
+  "Run the shell COMMAND asynchronously and show its output buffer.
+The buffer (`shell-command-buffer-name-async') replaces the buffer of
+the selected window at once, and the output appears in it as the
+command writes it.  See `async-shell-command-buffer' for what happens
+when a command is still running in it."
+  ;; shell-commandは終わるまで待つので、makeなどの間はEmacsが止まって
+  ;; 見える。async-shell-commandにし、出力のバッファを選んでいる
+  ;; ウィンドウにすぐ出す。
+  (let ((display-buffer-overriding-action '(display-buffer-same-window)))
+    (async-shell-command command)))
 
 (provide 'chibi-command)
 ;;; chibi-command.el ends here
