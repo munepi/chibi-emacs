@@ -80,10 +80,12 @@
      :popout     "#CE9178"              ; Dark+ string orange
      :subtle     "#3C3C3C"              ; input.border
      :faded      "#9D9D9D"              ; descriptionForeground
-     ;; ステータスバーはエディタの背景より暗い。subtleはregionなどにも
-     ;; 使うので、header lineの背景だけを変える。
-     :header-background "#181818"       ; statusBar.background
-     :border     "#2B2B2B"              ; statusBar.border
+     ;; header lineの背景は、Dark+の頃と同じく、本文より明るくする。
+     ;; Dark ModernのstatusBar.background（#181818）とstatusBar.border
+     ;; （#2B2B2B）は本文の背景とほとんど同じで、ウィンドウを分けたときに
+     ;; 区切りが分かりにくかった。区切り線は、subtleの色にする。
+     ;; subtleはregionなどにも使うので、header lineの背景だけを変える。
+     :header-background "#333333"
      :font-lock
      ((font-lock-comment-face        . "#6A9955")
       (font-lock-doc-face            . "#CE9178")
